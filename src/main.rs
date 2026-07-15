@@ -29,7 +29,9 @@ Embed in README.md (auto light/dark switching):
   </picture>
 
 Token lookup order: --token, $GITHUB_TOKEN, $GH_TOKEN, `gh auth token`.
-Public repos work unauthenticated (60 requests/hour rate limit)."
+Since GitHub's 2026 API change, the stargazers list requires a token from a
+user with access to the repo (owner/collaborator) — unauthenticated requests
+and GitHub Actions workflow tokens are rejected."
 )]
 struct Args {
     /// GitHub repo in owner/name format; repeat (or comma-separate) to compare

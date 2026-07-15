@@ -10,7 +10,10 @@ inputs:
     required: false
     default: ${{ github.repository }}
   token:
-    description: 'GitHub token used for API calls and for pushing the chart branch'
+    description: >-
+      Token used to read stargazers. Since GitHub's 2026 API change this must be a token of a
+      user with access to the charted repo (e.g. a fine-grained PAT stored as a secret) — the
+      automatic workflow token cannot list stargazers and will fail with 403.
     required: false
     default: ${{ github.token }}
   branch:
@@ -22,9 +25,9 @@ inputs:
     required: false
     default: ${{ github.repository }}
   push-token:
-    description: 'Token used to push the chart branch (defaults to the token input)'
+    description: 'Token used to push the chart branch (the automatic workflow token works here)'
     required: false
-    default: ''
+    default: ${{ github.token }}
   title:
     description: 'Chart title'
     required: false
@@ -120,7 +123,7 @@ runs:
       if: ${{ inputs.push == 'true' }}
       shell: bash
       env:
-        TOKEN: ${{ inputs.push-token != '' && inputs.push-token || inputs.token }}
+        TOKEN: ${{ inputs.push-token }}
         BRANCH: ${{ inputs.branch }}
         TARGET_REPO: ${{ inputs.target-repo }}
       run: |
