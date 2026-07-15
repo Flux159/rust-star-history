@@ -15,7 +15,13 @@ Built in Rust with a small footprint: one static ~2 MB binary with everything em
 
 Add a star-history chart to your own repo in three steps:
 
-**1.** Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with read-only access to your repo (Contents + Metadata is enough) and save it as an Actions secret named `STAR_HISTORY_TOKEN` (repo Settings → Secrets and variables → Actions). Since GitHub's 2026 API change, reading the stargazers list requires a token from a user with access to the repo — the automatic workflow token isn't allowed to.
+**1.** Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with read-only access to your repo (Contents + Metadata is enough) and save it as an Actions secret named `STAR_HISTORY_TOKEN` — either in the repo UI (Settings → Secrets and variables → Actions) or with the [gh CLI](https://cli.github.com/):
+
+```sh
+gh secret set STAR_HISTORY_TOKEN -R <USERNAME>/<REPONAME>   # paste the PAT when prompted
+```
+
+Since GitHub's 2026 API change, reading the stargazers list requires a token from a user with access to the repo — the automatic workflow token isn't allowed to.
 
 **2.** Create `.github/workflows/star-history.yml`:
 
