@@ -1,6 +1,10 @@
 # rust-star-history
 
-Generate self-hosted star-history SVG charts for any GitHub repository — a single static Rust binary (~2 MB), no gh CLI, no external services, no runtime dependencies.
+Generate self-hosted star-history SVG charts for any GitHub repository.
+
+**Why this exists:** GitHub's 2026 stargazers API change broke star-history.com embeds — the charts in countless READMEs simply stopped rendering for public visitors. Instead of depending on a third-party service that can break again, this tool generates the chart as a static SVG you own: committed to your repo (or published to a branch by the bundled GitHub Action), it renders forever with no external services, no rate limits, and nothing to break.
+
+Built in Rust with a small footprint: one static ~2 MB binary with everything embedded (even the font), talking directly to the GitHub API over HTTPS. Nothing else needs to be installed on your system — no gh CLI, no Python, no Node.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-dark.svg">
