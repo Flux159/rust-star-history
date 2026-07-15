@@ -57,7 +57,7 @@ The chart updates daily on a dedicated `star-history` branch (main history stays
 
 ## Install
 
-Prebuilt binaries (~2 MB) for Linux (x86_64/arm64), macOS (Intel/Apple Silicon), and Windows are attached to each [release](https://github.com/Flux159/rust-star-history/releases) — download, extract, run. Or build from source:
+Prebuilt binaries (~2 MB) for Linux (x86_64/arm64), macOS (Apple Silicon), and Windows are attached to each [release](https://github.com/Flux159/rust-star-history/releases) — download, extract, run. Or build from source (e.g. for Intel macs):
 
 ```sh
 cargo install --git https://github.com/Flux159/rust-star-history
@@ -250,7 +250,7 @@ Push a version tag and CD does the rest:
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-The `cd.yml` workflow runs the tests, syncs `Cargo.toml`/`Cargo.lock` to the tag's version with `cargo set-version` (committing the bump back to main and moving the tag onto it), creates a GitHub release with generated notes, and builds + uploads prebuilt binaries for all five supported platforms.
+The `cd.yml` workflow runs the tests, syncs `Cargo.toml`/`Cargo.lock` to the tag's version with `cargo set-version` (committing the bump back to main and moving the tag onto it), creates a GitHub release with generated notes, and builds + uploads prebuilt binaries for all four supported platforms.
 
 ## Font license
 
