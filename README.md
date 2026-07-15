@@ -28,7 +28,7 @@ jobs:
   star-history:
     runs-on: ubuntu-latest
     steps:
-      - uses: Flux159/rust-star-history@main
+      - uses: Flux159/rust-star-history@v0.2.0
 ```
 
 **2.** Run it once (Actions tab → Star History → Run workflow), then put this in your `README.md`, replacing both `<USERNAME>/<REPONAME>` with your repo (e.g. `Flux159/mcp-server-kubernetes`):
@@ -146,7 +146,7 @@ You only need a PAT in two situations. In both cases, [create a fine-grained PAT
 **Charting a private repo other than the one the workflow runs in** — the PAT needs read access (Contents + Metadata) to that private repo:
 
 ```yaml
-      - uses: Flux159/rust-star-history@main
+      - uses: Flux159/rust-star-history@v0.2.0
         with:
           repos: your-org/private-repo
           token: ${{ secrets.STAR_HISTORY_PAT }}
@@ -155,7 +155,7 @@ You only need a PAT in two situations. In both cases, [create a fine-grained PAT
 **Pushing the charts to a different repo than the one the workflow runs in** — the PAT needs write access (Contents) to the target repo:
 
 ```yaml
-      - uses: Flux159/rust-star-history@main
+      - uses: Flux159/rust-star-history@v0.2.0
         with:
           target-repo: your-org/other-repo
           push-token: ${{ secrets.STAR_HISTORY_PAT }}
@@ -182,7 +182,7 @@ All inputs are optional:
 Example — comparison chart with custom colors:
 
 ```yaml
-      - uses: Flux159/rust-star-history@main
+      - uses: Flux159/rust-star-history@v0.2.0
         with:
           repos: Flux159/mcp-server-kubernetes,Flux159/mcp-chat
           colors: '#dd4528,#28a9dd'

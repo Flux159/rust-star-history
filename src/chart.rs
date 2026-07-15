@@ -263,11 +263,15 @@ pub fn generate_svg(series: &[Series], opts: &Options) -> String {
     );
     for (i, s) in series.iter().enumerate() {
         let row_y = legend_y + i as f64 * row_h;
+        // Repo labels link to the repo (clickable when the SVG is opened
+        // directly; inert inside README <img> embeds like all SVG links)
         legend += &format!(
-            "<rect width=\"{swatch}\" height=\"{swatch}\" x=\"{}\" y=\"{:.0}\" rx=\"2\" ry=\"2\" fill=\"{}\"{XKCD}/>{}",
+            "<rect width=\"{swatch}\" height=\"{swatch}\" x=\"{}\" y=\"{:.0}\" rx=\"2\" ry=\"2\" fill=\"{}\"{XKCD}/>\
+             <a href=\"https://github.com/{}\" target=\"_blank\" rel=\"noopener\">{}</a>",
             legend_x + legend_pad,
             row_y + 12.0,
             s.color,
+            esc(s.repo),
             TextEl::new(
                 legend_x + legend_pad + swatch + swatch_gap,
                 format!("{:.0}", row_y + 20.0),
@@ -602,6 +606,8 @@ mod tests {
         let svg = generate_svg(&series, &sample_opts());
         assert!(svg.contains("owner/repo-a"));
         assert!(svg.contains("owner/repo-b"));
+        assert!(svg.contains("<a href=\"https://github.com/owner/repo-a\""));
+        assert!(svg.contains("<a href=\"https://github.com/owner/repo-b\""));
         assert!(svg.contains("#28a9dd"));
         assert!(
             !svg.contains("url(#g)"),

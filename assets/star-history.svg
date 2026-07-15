@@ -13,7 +13,7 @@
   </defs>
   <rect width="800" height="533" fill="#fff"/>
   <text x="50%" y="30" fill="#000" font-size="20" font-family="Handlee, 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', 'Segoe Print', cursive" font-weight="bold" text-anchor="middle">Star History</text>
-  <rect width="260" height="32" x="105" y="90" fill="#fff" fill-opacity="0.9" stroke="#000" stroke-width="1.5" rx="4" ry="4" filter="url(#xkcdify)"/><rect width="8" height="8" x="115" y="102" rx="2" ry="2" fill="#dd4528" filter="url(#xkcdify)"/><text x="131" y="110" fill="#000" font-size="15" font-family="Handlee, 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', 'Segoe Print', cursive" font-weight="bold">Flux159/mcp-server-kubernetes</text>
+  <rect width="260" height="32" x="105" y="90" fill="#fff" fill-opacity="0.9" stroke="#000" stroke-width="1.5" rx="4" ry="4" filter="url(#xkcdify)"/><rect width="8" height="8" x="115" y="102" rx="2" ry="2" fill="#dd4528" filter="url(#xkcdify)"/><a href="https://github.com/Flux159/mcp-server-kubernetes" target="_blank" rel="noopener"><text x="131" y="110" fill="#000" font-size="15" font-family="Handlee, 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', 'Segoe Print', cursive" font-weight="bold">Flux159/mcp-server-kubernetes</text></a>
   <text x="85" y="468.0" fill="#000" font-size="16" font-family="Handlee, 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', 'Segoe Print', cursive" font-weight="bold" text-anchor="end">0</text>
   <line x1="90" y1="408.3" x2="765" y2="408.3" stroke="#eee" stroke-width="1" filter="url(#xkcdify)"/>
   <text x="85" y="413.3" fill="#000" font-size="16" font-family="Handlee, 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', 'Segoe Print', cursive" font-weight="bold" text-anchor="end">250</text>

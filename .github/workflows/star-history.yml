@@ -14,4 +14,4 @@ jobs:
   star-history:
     runs-on: ubuntu-latest
     steps:
-      - uses: Flux159/rust-star-history@main
+      - uses: Flux159/rust-star-history@v0.2.0
