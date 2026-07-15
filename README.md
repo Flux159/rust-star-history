@@ -3,8 +3,8 @@
 Generate self-hosted star-history SVG charts for any GitHub repository — a single static Rust binary (~2 MB), no gh CLI, no external services, no runtime dependencies.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="star-history-dark.svg">
-  <img alt="Star History" src="star-history.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-dark.svg">
+  <img alt="Star History" src="assets/star-history.svg">
 </picture>
 
 ## Quickstart
@@ -98,6 +98,32 @@ rust-star-history --repo owner/name --token ghp_xxx
 | `--both` | off | Write light `OUTPUT` plus `OUTPUT-dark` variant |
 | `--token` | env / gh fallback | GitHub API token |
 | `--max-pages` | `100` | Max stargazer pages per repo (100 stars each); larger repos are sampled evenly |
+
+## Examples
+
+A single repo gets a gradient area fill:
+
+```sh
+rust-star-history --repo Flux159/mcp-server-kubernetes --both
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-dark.svg">
+  <img alt="Star history of Flux159/mcp-server-kubernetes" src="assets/star-history.svg">
+</picture>
+
+Comparison charts draw one line per repo — pass `--repo` as many times as you like (or comma-separate); lines cycle through a built-in 8-color palette, or set your own with `--color`:
+
+```sh
+rust-star-history --repo Flux159/mcp-server-kubernetes --repo Flux159/mcp-chat --both
+# three or more works too, with custom colors:
+rust-star-history --repo owner/a --repo owner/b --repo owner/c --color '#dd4528,#28a9dd,#a3a948'
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-compare-dark.svg">
+  <img alt="Star history comparison of Flux159/mcp-server-kubernetes and Flux159/mcp-chat" src="assets/star-history-compare.svg">
+</picture>
 
 ## GitHub Action: automated, always-fresh charts
 
