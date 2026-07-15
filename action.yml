@@ -17,6 +17,14 @@ inputs:
     description: 'Branch the SVGs are force-pushed to (kept separate so main history stays clean)'
     required: false
     default: 'star-history'
+  target-repo:
+    description: 'Repo (owner/name) the chart branch is pushed to; requires push-token with write access when not the current repo'
+    required: false
+    default: ${{ github.repository }}
+  push-token:
+    description: 'Token used to push the chart branch (defaults to the token input)'
+    required: false
+    default: ''
   title:
     description: 'Chart title'
     required: false
@@ -112,8 +120,9 @@ runs:
       if: ${{ inputs.push == 'true' }}
       shell: bash
       env:
-        TOKEN: ${{ inputs.token }}
+        TOKEN: ${{ inputs.push-token != '' && inputs.push-token || inputs.token }}
         BRANCH: ${{ inputs.branch }}
+        TARGET_REPO: ${{ inputs.target-repo }}
       run: |
         set -euo pipefail
         publish_dir="$(mktemp -d)"
@@ -124,5 +133,5 @@ runs:
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         git add star-history.svg star-history-dark.svg
         git commit -q -m "chore: update star history charts"
-        git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
-        echo "Published star-history.svg and star-history-dark.svg to branch '${BRANCH}'"
+        git push -q --force "https://x-access-token:${TOKEN}@github.com/${TARGET_REPO}.git" "HEAD:refs/heads/${BRANCH}"
+        echo "Published star-history.svg and star-history-dark.svg to ${TARGET_REPO}@${BRANCH}"

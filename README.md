@@ -133,10 +133,27 @@ The bundled action regenerates your charts on a schedule and force-pushes them t
 
 The `permissions: contents: write` line is the *only* auth setup. The workflow's automatic `${{ github.token }}` can already read stargazers of any **public** repo (including other people's repos, so comparison charts work too), and the `contents: write` grant lets it push the chart branch back to the repo the workflow runs in. The automatic token gets 1,000 API requests/hour — enough to chart repos with up to 100K stars.
 
-You only need a PAT (passed via the `token` input) in two situations:
+You only need a PAT in two situations. In both cases, [create a fine-grained PAT](https://github.com/settings/personal-access-tokens/new), add it to the workflow repo as an Actions secret (repo Settings → Secrets and variables → Actions → New repository secret), and pass it via the action's inputs:
 
-- charting a **private repo other than** the one the workflow runs in
-- pushing the charts to a **different repo** than the one the workflow runs in
+**Charting a private repo other than the one the workflow runs in** — the PAT needs read access (Contents + Metadata) to that private repo:
+
+```yaml
+      - uses: Flux159/rust-star-history@main
+        with:
+          repos: your-org/private-repo
+          token: ${{ secrets.STAR_HISTORY_PAT }}
+```
+
+**Pushing the charts to a different repo than the one the workflow runs in** — the PAT needs write access (Contents) to the target repo:
+
+```yaml
+      - uses: Flux159/rust-star-history@main
+        with:
+          target-repo: your-org/other-repo
+          push-token: ${{ secrets.STAR_HISTORY_PAT }}
+```
+
+The two compose: chart someone's private repo *and* publish elsewhere by passing `token` for the API reads and `push-token` for the branch push.
 
 ### Action inputs
 
@@ -147,6 +164,8 @@ All inputs are optional:
 | `repos` | the current repo | Repo(s) to chart, comma-separated for a comparison chart |
 | `token` | `${{ github.token }}` | Token for API calls and pushing the branch. Needed explicitly only when charting *other* repos beyond the API's unauthenticated reach or pushing elsewhere |
 | `branch` | `star-history` | Branch the SVGs are published to |
+| `target-repo` | the current repo | Repo the chart branch is pushed to (cross-repo publishing needs `push-token`) |
+| `push-token` | same as `token` | Token used only for the branch push, e.g. a PAT with write access to `target-repo` |
 | `title` | `Star History` | Chart title |
 | `colors` | built-in palette | Comma-separated hex colors, one per repo |
 | `width` / `height` | `800` / `533` | Chart dimensions |
