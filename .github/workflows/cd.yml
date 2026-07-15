@@ -2,7 +2,7 @@
 #   1. syncs Cargo.toml/Cargo.lock to the tag's version (cargo set-version),
 #      commits the bump to main, and moves the tag onto that commit
 #   2. creates a GitHub release with generated notes
-#   3. builds prebuilt binaries for five platforms and uploads them as
+#   3. builds prebuilt binaries for four platforms and uploads them as
 #      release assets (which action.yml downloads instead of compiling)
 name: cd
 
@@ -70,8 +70,6 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-          - os: macos-13
-            target: x86_64-apple-darwin
           - os: macos-latest
             target: aarch64-apple-darwin
           - os: windows-latest
