@@ -352,7 +352,7 @@ pub fn generate_svg(series: &[Series], opts: &Options) -> String {
         );
     }
     x_labels.push(
-        TextEl::new("50%", h - 8.0, "Date", pal.fg)
+        TextEl::new("50%", h - 14.0, "Date", pal.fg)
             .size(17)
             .anchor("middle")
             .render(),
@@ -469,7 +469,7 @@ pub fn generate_svg(series: &[Series], opts: &Options) -> String {
             "  <a href=\"{}\" target=\"_blank\" rel=\"noopener\"><text x=\"{:.0}\" y=\"{:.0}\" font-size=\"13\" font-family=\"{FONT_FAMILY}\" fill=\"{}\" text-anchor=\"end\">Made with Flux159/rust-star-history</text></a>",
             env!("CARGO_PKG_REPOSITORY"),
             w - pad_r - 2.0,
-            h - 6.0,
+            h - 12.0,
             if opts.dark { "#fff" } else { "#000" }
         ),
         "</svg>".into(),
