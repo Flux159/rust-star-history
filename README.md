@@ -57,15 +57,11 @@ The chart updates daily on a dedicated `star-history` branch (main history stays
 
 ## Install
 
-Prebuilt binaries (~2 MB) for Linux (x86_64/arm64), macOS (Apple Silicon), and Windows are attached to each [release](https://github.com/Flux159/rust-star-history/releases) — download, extract, run. Or build from source (e.g. for Intel macs):
-
 ```sh
-cargo install --git https://github.com/Flux159/rust-star-history
-# or from a checkout:
-cargo install --path .
-# or just build a release binary:
-cargo build --release   # → target/release/rust-star-history
+curl -fsSL https://raw.githubusercontent.com/Flux159/rust-star-history/main/install.sh | sh
 ```
+
+Detects your platform and installs the prebuilt binary (~2 MB) from the latest [release](https://github.com/Flux159/rust-star-history/releases) into `~/.local/bin` (override with `INSTALL_DIR=/usr/local/bin`). Prebuilt targets: Linux x86_64/arm64, macOS Apple Silicon, and Windows (via Git Bash). Tarballs can also be downloaded straight from the releases page, or see [Install from source](#install-from-source) for other platforms.
 
 ## Usage
 
@@ -124,6 +120,18 @@ rust-star-history --repo owner/a --repo owner/b --repo owner/c --color '#dd4528,
   <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-compare-dark.svg">
   <img alt="Star history comparison of Flux159/mcp-server-kubernetes and Flux159/mcp-chat" src="assets/star-history-compare.svg">
 </picture>
+
+## Install from source
+
+Works on any platform with a Rust toolchain (including Intel macs):
+
+```sh
+cargo install --git https://github.com/Flux159/rust-star-history
+# or from a checkout:
+cargo install --path .
+# or just build a release binary:
+cargo build --release   # → target/release/rust-star-history
+```
 
 ## GitHub Action: automated, always-fresh charts
 
@@ -204,7 +212,7 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - run: cargo install --locked --git https://github.com/Flux159/rust-star-history
+      - run: curl -fsSL https://raw.githubusercontent.com/Flux159/rust-star-history/main/install.sh | sh
       - run: rust-star-history --repo "${{ github.repository }}" --both
       - run: |
           git config user.name "github-actions[bot]"
