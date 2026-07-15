@@ -29,9 +29,9 @@ impl Client {
     }
 
     fn get(&self, path: &str, accept: &str) -> Result<Value, String> {
+        const MAX_ATTEMPTS: u32 = 6;
         let url = format!("{API}{path}");
-        let mut attempt = 0;
-        loop {
+        for attempt in 1..=MAX_ATTEMPTS {
             let mut req = self
                 .agent
                 .get(&url)
@@ -41,7 +41,6 @@ impl Client {
             if let Some(token) = &self.token {
                 req = req.set("Authorization", &format!("Bearer {token}"));
             }
-            attempt += 1;
             match req.call() {
                 Ok(resp) => {
                     let text = resp
@@ -50,20 +49,35 @@ impl Client {
                     return serde_json::from_str(&text)
                         .map_err(|e| format!("GitHub returned invalid JSON: {e}"));
                 }
-                Err(ureq::Error::Status(code, resp)) if code >= 500 && attempt < 3 => {
-                    drop(resp);
-                    std::thread::sleep(Duration::from_millis(500 * attempt));
-                }
                 Err(ureq::Error::Status(code, resp)) => {
-                    return Err(friendly_http_error(code, resp, path, self.token.is_some()));
+                    let retry_after = resp
+                        .header("retry-after")
+                        .and_then(|v| v.parse::<u64>().ok());
+                    let body = resp.into_string().unwrap_or_default();
+                    // Retry server errors and rate limits (GitHub's burst
+                    // buckets 403 transiently even with quota remaining), but
+                    // fail fast on real auth/permission errors.
+                    if (code >= 500 || is_rate_limited(code, &body)) && attempt < MAX_ATTEMPTS {
+                        let delay = retry_after.unwrap_or(1 << attempt).min(60);
+                        eprintln!(
+                            "\n  GitHub API {code} on attempt {attempt}/{MAX_ATTEMPTS}, retrying in {delay}s..."
+                        );
+                        std::thread::sleep(Duration::from_secs(delay));
+                        continue;
+                    }
+                    return Err(friendly_http_error(code, &body, path, self.token.is_some()));
                 }
-                Err(e) if attempt < 3 => {
-                    eprintln!("  transient error ({e}), retrying...");
-                    std::thread::sleep(Duration::from_millis(500 * attempt));
+                Err(e) if attempt < MAX_ATTEMPTS => {
+                    eprintln!(
+                        "  transient error ({e}), retrying in {}s...",
+                        1u64 << attempt
+                    );
+                    std::thread::sleep(Duration::from_secs(1 << attempt));
                 }
                 Err(e) => return Err(format!("request to {url} failed: {e}")),
             }
         }
+        unreachable!("retry loop always returns")
     }
 
     /// Number of stargazers reported by the repo endpoint.
@@ -175,23 +189,54 @@ fn collapse(mut anchors: Vec<(Day, u64)>) -> Cumulative {
     out
 }
 
-fn friendly_http_error(code: u16, resp: ureq::Response, path: &str, had_token: bool) -> String {
-    let body = resp.into_string().unwrap_or_default();
-    let message = serde_json::from_str::<Value>(&body)
+/// Rate-limit 403/429s are transient and worth retrying; permission 403s are not.
+fn is_rate_limited(code: u16, body: &str) -> bool {
+    if code != 403 && code != 429 {
+        return false;
+    }
+    let b = body.to_lowercase();
+    b.contains("rate limit") || b.contains("secondary") || b.contains("abuse")
+}
+
+fn friendly_http_error(code: u16, body: &str, path: &str, had_token: bool) -> String {
+    let message = serde_json::from_str::<Value>(body)
         .ok()
         .and_then(|v| v["message"].as_str().map(str::to_string))
         .unwrap_or_else(|| body.chars().take(200).collect());
-    let hint = match code {
-        401 => "The token was rejected — check that it is valid and not expired.",
-        403 | 429 => {
-            if had_token {
-                "Rate limited or access denied. Your token may lack access to this repo's stargazers."
-            } else {
-                "Rate limited or access denied. Pass a token via --token or GITHUB_TOKEN (unauthenticated requests are limited to 60/hour)."
+    let hint = if code == 403
+        && message
+            .to_lowercase()
+            .contains("permission to view the stargazers")
+    {
+        "GitHub's 2026 API change restricts the stargazers list to tokens of users with access \
+         to the repo (owner/collaborator). Pass such a token via --token or GITHUB_TOKEN. In \
+         GitHub Actions, the automatic workflow token cannot read stargazers — set the action's \
+         `token` input to a PAT stored as a secret."
+    } else {
+        match code {
+            401 => {
+                if had_token {
+                    "The token was rejected — check that it is valid and not expired."
+                } else {
+                    "Authentication is required since GitHub's 2026 API change. Pass a token via \
+                     --token or GITHUB_TOKEN (it must belong to a user with access to the repo)."
+                }
             }
+            403 | 429 => {
+                if had_token {
+                    "Rate limited or access denied (still failing after retries). Your token may \
+                     lack access to this repo's stargazers."
+                } else {
+                    "Rate limited or access denied (still failing after retries). Pass a token \
+                     via --token or GITHUB_TOKEN."
+                }
+            }
+            404 => {
+                "Repo not found. Check the owner/name spelling; private repos need a token with \
+                 repo access."
+            }
+            _ => "",
         }
-        404 => "Repo not found. Check the owner/name spelling; private repos need a token with repo access.",
-        _ => "",
     };
     format!("GitHub API error {code} on {path}: {message}\n{hint}")
         .trim_end()
@@ -224,7 +269,10 @@ pub fn resolve_token(explicit: Option<String>) -> Option<String> {
             }
         }
     }
-    eprintln!("No token found; using unauthenticated requests (60/hour limit)");
+    eprintln!(
+        "No token found; trying unauthenticated (likely to fail — GitHub's 2026 API change \
+         requires a token from a user with access to the repo)"
+    );
     None
 }
 
@@ -234,6 +282,35 @@ mod tests {
 
     fn d(s: &str) -> Day {
         Day::parse(s).unwrap()
+    }
+
+    #[test]
+    fn rate_limit_errors_are_retryable_but_permission_errors_are_not() {
+        assert!(is_rate_limited(
+            403,
+            r#"{"message":"API rate limit exceeded for user ID 1"}"#
+        ));
+        assert!(is_rate_limited(
+            429,
+            r#"{"message":"You have exceeded a secondary rate limit"}"#
+        ));
+        assert!(!is_rate_limited(
+            403,
+            r#"{"message":"You do not have permission to view the stargazers of this repository"}"#
+        ));
+        assert!(!is_rate_limited(200, "rate limit"));
+    }
+
+    #[test]
+    fn permission_error_explains_2026_api_change() {
+        let msg = friendly_http_error(
+            403,
+            r#"{"message":"You do not have permission to view the stargazers of this repository"}"#,
+            "/repos/o/r/stargazers",
+            true,
+        );
+        assert!(msg.contains("2026 API change"));
+        assert!(msg.contains("`token` input"));
     }
 
     #[test]
