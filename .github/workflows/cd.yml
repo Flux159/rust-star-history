@@ -1,4 +1,4 @@
-# Release flow: push a tag like v0.2.0 and this workflow
+# Release flow: push a tag like v1.0.0 and this workflow
 #   1. syncs Cargo.toml/Cargo.lock to the tag's version (cargo set-version),
 #      commits the bump to main, and moves the tag onto that commit
 #   2. creates a GitHub release with generated notes
@@ -20,7 +20,7 @@ jobs:
     outputs:
       tag: ${{ github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
@@ -76,7 +76,7 @@ jobs:
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.release.outputs.tag }}
 
