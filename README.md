@@ -84,7 +84,16 @@ jobs:
       - uses: Flux159/rust-star-history@main
 ```
 
-That's it — the default `${{ github.token }}` is used automatically; no PAT or secrets setup is needed for charting the repo the workflow runs in. Run it once manually (Actions tab → Star History → Run workflow) to create the branch.
+That's it. Run it once manually (Actions tab → Star History → Run workflow) to create the branch.
+
+### No PAT required
+
+The `permissions: contents: write` line is the *only* auth setup. The workflow's automatic `${{ github.token }}` can already read stargazers of any **public** repo (including other people's repos, so comparison charts work too), and the `contents: write` grant lets it push the chart branch back to the repo the workflow runs in. The automatic token gets 1,000 API requests/hour — enough to chart repos with up to 100K stars.
+
+You only need a PAT (passed via the `token` input) in two situations:
+
+- charting a **private repo other than** the one the workflow runs in
+- pushing the charts to a **different repo** than the one the workflow runs in
 
 **2.** After the first run, the branch `star-history` contains `star-history.svg` and `star-history-dark.svg`. Embed them in your README via raw URLs (replace `OWNER/REPO`):
 
@@ -121,6 +130,38 @@ Example — comparison chart with custom colors:
 ```
 
 The action compiles the CLI with the runner's preinstalled Rust toolchain on first use (about a minute); the rest of the run is a few seconds.
+
+### Using the CLI directly in a workflow (without the action)
+
+The same no-PAT rule applies: the CLI picks up `$GITHUB_TOKEN` from the environment automatically, so exporting the workflow's automatic token is all it needs. This example commits the SVGs to the current branch instead of a separate one:
+
+```yaml
+name: Star History
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  star-history:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo install --locked --git https://github.com/Flux159/rust-star-history
+      - run: rust-star-history --repo "${{ github.repository }}" --both
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add star-history.svg star-history-dark.svg
+          git diff --cached --quiet || git commit -m "chore: update star history charts"
+          git push
+```
 
 ## Embedding from the same branch
 
