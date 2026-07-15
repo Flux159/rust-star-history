@@ -8,7 +8,12 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 
 const FONT_WOFF2: &[u8] = include_bytes!("../assets/handlee-subset.woff2");
-const FONT_FAMILY: &str = "Handlee, cursive";
+// Fallbacks cover contexts where the embedded font is blocked (e.g. the CSP
+// on raw.githubusercontent.com): casual handwriting fonts commonly installed
+// on macOS/Windows/Linux, before the generic keyword (which macOS maps to the
+// very-serif Apple Chancery).
+const FONT_FAMILY: &str =
+    "Handlee, 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', 'Segoe Print', cursive";
 const XKCD: &str = " filter=\"url(#xkcdify)\"";
 
 /// Line colors assigned to series without an explicit --color, first repo red.
