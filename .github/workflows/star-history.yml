@@ -1,0 +1,17 @@
+# Regenerates this repo's own star-history charts weekly.
+# Doubles as a working example of the reusable action for other repos.
+name: Star History
+
+on:
+  schedule:
+    - cron: '17 3 * * 1' # Mondays 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  star-history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Flux159/rust-star-history@main

@@ -1,0 +1,89 @@
+name: 'rust-star-history'
+description: 'Generate self-hosted star-history SVG charts (light + dark) and publish them to a branch in your repo'
+branding:
+  icon: 'star'
+  color: 'orange'
+
+inputs:
+  repos:
+    description: 'Repo(s) to chart in owner/name format, comma-separated for a comparison chart'
+    required: false
+    default: ${{ github.repository }}
+  token:
+    description: 'GitHub token used for API calls and for pushing the chart branch'
+    required: false
+    default: ${{ github.token }}
+  branch:
+    description: 'Branch the SVGs are force-pushed to (kept separate so main history stays clean)'
+    required: false
+    default: 'star-history'
+  title:
+    description: 'Chart title'
+    required: false
+    default: 'Star History'
+  colors:
+    description: 'Comma-separated hex line colors, one per repo (defaults to built-in palette)'
+    required: false
+    default: ''
+  width:
+    description: 'Chart width in px'
+    required: false
+    default: '800'
+  height:
+    description: 'Chart height in px'
+    required: false
+    default: '533'
+  push:
+    description: 'Set to false to only generate star-history*.svg into the workspace without publishing'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install rust-star-history
+      shell: bash
+      run: |
+        set -euo pipefail
+        if command -v rust-star-history >/dev/null 2>&1; then
+          echo "rust-star-history already installed"
+        else
+          cargo install --locked --git "https://github.com/${GITHUB_ACTION_REPOSITORY:-Flux159/rust-star-history}" rust-star-history
+        fi
+
+    - name: Generate charts
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        REPOS: ${{ inputs.repos }}
+        TITLE: ${{ inputs.title }}
+        COLORS: ${{ inputs.colors }}
+        WIDTH: ${{ inputs.width }}
+        HEIGHT: ${{ inputs.height }}
+      run: |
+        set -euo pipefail
+        export PATH="$HOME/.cargo/bin:$PATH"
+        args=(--repo "$REPOS" --both --title "$TITLE" --width "$WIDTH" --height "$HEIGHT" --output star-history.svg)
+        if [ -n "$COLORS" ]; then
+          args+=(--color "$COLORS")
+        fi
+        rust-star-history "${args[@]}"
+
+    - name: Publish charts to branch
+      if: ${{ inputs.push == 'true' }}
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
+        BRANCH: ${{ inputs.branch }}
+      run: |
+        set -euo pipefail
+        publish_dir="$(mktemp -d)"
+        cp star-history.svg star-history-dark.svg "$publish_dir/"
+        cd "$publish_dir"
+        git init -q -b "$BRANCH"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add star-history.svg star-history-dark.svg
+        git commit -q -m "chore: update star history charts"
+        git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
+        echo "Published star-history.svg and star-history-dark.svg to branch '${BRANCH}'"
