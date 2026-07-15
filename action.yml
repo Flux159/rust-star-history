@@ -1,0 +1,128 @@
+name: 'rust-star-history'
+description: 'Generate self-hosted star-history SVG charts (light + dark) and publish them to a branch in your repo'
+branding:
+  icon: 'star'
+  color: 'orange'
+
+inputs:
+  repos:
+    description: 'Repo(s) to chart in owner/name format, comma-separated for a comparison chart'
+    required: false
+    default: ${{ github.repository }}
+  token:
+    description: 'GitHub token used for API calls and for pushing the chart branch'
+    required: false
+    default: ${{ github.token }}
+  branch:
+    description: 'Branch the SVGs are force-pushed to (kept separate so main history stays clean)'
+    required: false
+    default: 'star-history'
+  title:
+    description: 'Chart title'
+    required: false
+    default: 'Star History'
+  colors:
+    description: 'Comma-separated hex line colors, one per repo (defaults to built-in palette)'
+    required: false
+    default: ''
+  width:
+    description: 'Chart width in px'
+    required: false
+    default: '800'
+  height:
+    description: 'Chart height in px'
+    required: false
+    default: '533'
+  push:
+    description: 'Set to false to only generate star-history*.svg into the workspace without publishing'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install rust-star-history
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        if command -v rust-star-history >/dev/null 2>&1; then
+          echo "rust-star-history already installed"
+          exit 0
+        fi
+
+        slug="${GITHUB_ACTION_REPOSITORY:-Flux159/rust-star-history}"
+        case "$(uname -m)" in
+          x86_64|amd64) arch="x86_64" ;;
+          aarch64|arm64) arch="aarch64" ;;
+          *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+        esac
+        case "$(uname -s)" in
+          Linux) triple="${arch}-unknown-linux-gnu" ;;
+          Darwin) triple="${arch}-apple-darwin" ;;
+          MINGW*|MSYS*|CYGWIN*) triple="${arch}-pc-windows-msvc" ;;
+          *) echo "unsupported OS: $(uname -s)" >&2; exit 1 ;;
+        esac
+        asset="rust-star-history-${triple}.tar.gz"
+
+        # Use the release matching the action's own version tag when pinned
+        # (e.g. uses: Flux159/rust-star-history@v0.2.0), else the latest release
+        if [[ "${GITHUB_ACTION_REF:-}" == v[0-9]* ]]; then
+          release_path="releases/tags/${GITHUB_ACTION_REF}"
+        else
+          release_path="releases/latest"
+        fi
+
+        install_dir="${RUNNER_TEMP}/rust-star-history-bin"
+        mkdir -p "$install_dir"
+        asset_url="$(curl -fsSL -H "Authorization: Bearer ${TOKEN}" \
+          "https://api.github.com/repos/${slug}/${release_path}" \
+          | jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .url' || true)"
+
+        if [ -n "$asset_url" ] && [ "$asset_url" != "null" ]; then
+          curl -fsSL -H "Authorization: Bearer ${TOKEN}" -H "Accept: application/octet-stream" \
+            "$asset_url" | tar -xz -C "$install_dir"
+          echo "Installed prebuilt ${asset} from ${slug} ${release_path##*/}"
+        else
+          echo "::notice::No prebuilt asset ${asset} found in ${slug} ${release_path}; building from source (slower)"
+          cargo install --locked --git "https://github.com/${slug}" --root "$install_dir" rust-star-history
+          mv "$install_dir/bin/rust-star-history" "$install_dir/"
+        fi
+        echo "$install_dir" >> "$GITHUB_PATH"
+
+    - name: Generate charts
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        REPOS: ${{ inputs.repos }}
+        TITLE: ${{ inputs.title }}
+        COLORS: ${{ inputs.colors }}
+        WIDTH: ${{ inputs.width }}
+        HEIGHT: ${{ inputs.height }}
+      run: |
+        set -euo pipefail
+        args=(--repo "$REPOS" --both --title "$TITLE" --width "$WIDTH" --height "$HEIGHT" --output star-history.svg)
+        if [ -n "$COLORS" ]; then
+          args+=(--color "$COLORS")
+        fi
+        rust-star-history "${args[@]}"
+
+    - name: Publish charts to branch
+      if: ${{ inputs.push == 'true' }}
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
+        BRANCH: ${{ inputs.branch }}
+      run: |
+        set -euo pipefail
+        publish_dir="$(mktemp -d)"
+        cp star-history.svg star-history-dark.svg "$publish_dir/"
+        cd "$publish_dir"
+        git init -q -b "$BRANCH"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add star-history.svg star-history-dark.svg
+        git commit -q -m "chore: update star history charts"
+        git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
+        echo "Published star-history.svg and star-history-dark.svg to branch '${BRANCH}'"
