@@ -1,6 +1,6 @@
 [package]
 name = "rust-star-history"
-version = "0.2.1"
+version = "1.0.0"
 edition = "2021"
 description = "Generate self-contained star-history SVG charts for any GitHub repo. No gh CLI required."
 license = "MIT"
