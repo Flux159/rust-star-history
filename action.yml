@@ -78,7 +78,7 @@ runs:
         asset="rust-star-history-${triple}.tar.gz"
 
         # Use the release matching the action's own version tag when pinned
-        # (e.g. uses: Flux159/rust-star-history@v0.2.0), else the latest release
+        # (e.g. uses: Flux159/rust-star-history@v1.0.0), else the latest release
         if [[ "${GITHUB_ACTION_REF:-}" == v[0-9]* ]]; then
           release_path="releases/tags/${GITHUB_ACTION_REF}"
         else

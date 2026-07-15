@@ -34,7 +34,7 @@ jobs:
   star-history:
     runs-on: ubuntu-latest
     steps:
-      - uses: Flux159/rust-star-history@v0.2.1
+      - uses: Flux159/rust-star-history@v1.0.0
         with:
           token: ${{ secrets.STAR_HISTORY_TOKEN }}
 ```
@@ -156,7 +156,7 @@ Pushing the chart branch is a different story: the automatic token handles that 
 **Pushing the charts to a different repo than the one the workflow runs in** — pass a `push-token` with write access (Contents) to the target repo:
 
 ```yaml
-      - uses: Flux159/rust-star-history@v0.2.1
+      - uses: Flux159/rust-star-history@v1.0.0
         with:
           target-repo: your-org/other-repo
           token: ${{ secrets.STAR_HISTORY_TOKEN }}
@@ -182,7 +182,7 @@ All inputs are optional:
 Example — comparison chart with custom colors:
 
 ```yaml
-      - uses: Flux159/rust-star-history@v0.2.1
+      - uses: Flux159/rust-star-history@v1.0.0
         with:
           repos: Flux159/mcp-server-kubernetes,Flux159/mcp-chat
           colors: '#dd4528,#28a9dd'
@@ -256,7 +256,7 @@ cargo build --release
 Push a version tag and CD does the rest:
 
 ```sh
-git tag v0.2.0 && git push origin v0.2.0
+git tag v1.0.1 && git push origin v1.0.1
 ```
 
 The `cd.yml` workflow runs the tests, syncs `Cargo.toml`/`Cargo.lock` to the tag's version with `cargo set-version` (committing the bump back to main and moving the tag onto it), creates a GitHub release with generated notes, and builds + uploads prebuilt binaries for all four supported platforms.
