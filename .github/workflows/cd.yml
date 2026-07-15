@@ -1,0 +1,102 @@
+# Release flow: push a tag like v0.2.0 and this workflow
+#   1. syncs Cargo.toml/Cargo.lock to the tag's version (cargo set-version),
+#      commits the bump to main, and moves the tag onto that commit
+#   2. creates a GitHub release with generated notes
+#   3. builds prebuilt binaries for five platforms and uploads them as
+#      release assets (which action.yml downloads instead of compiling)
+name: cd
+
+on:
+  push:
+    tags:
+      - v*
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Install cargo-edit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-edit
+
+      - name: Sync version files to tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cargo set-version "$VERSION"
+          cargo update --workspace
+
+      - name: Commit version bump and move tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Version files already match ${GITHUB_REF_NAME}"
+          else
+            git add Cargo.toml Cargo.lock
+            git commit -m "Bump version to ${GITHUB_REF_NAME#v}"
+            git push origin main
+            git tag -f "$GITHUB_REF_NAME"
+            git push -f origin "$GITHUB_REF_NAME"
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag \
+            || echo "Release $GITHUB_REF_NAME already exists"
+
+  build:
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Build release binary
+        shell: bash
+        run: |
+          rustup target add "${{ matrix.target }}"
+          cargo build --release --locked --target "${{ matrix.target }}"
+          mkdir dist
+          bin="target/${{ matrix.target }}/release/rust-star-history"
+          if [ -f "${bin}.exe" ]; then bin="${bin}.exe"; fi
+          cp "$bin" dist/
+          tar -czf "rust-star-history-${{ matrix.target }}.tar.gz" -C dist .
+
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ needs.release.outputs.tag }}" \
+            "rust-star-history-${{ matrix.target }}.tar.gz" --clobber

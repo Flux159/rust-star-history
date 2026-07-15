@@ -7,6 +7,43 @@ Generate self-hosted star-history SVG charts for any GitHub repository — a sin
   <img alt="Star History" src="star-history.svg">
 </picture>
 
+## Quickstart
+
+Add a star-history chart to your own repo in two steps — no PAT, no secrets, no other setup:
+
+**1.** Create `.github/workflows/star-history.yml`:
+
+```yaml
+name: Star History
+
+on:
+  schedule:
+    - cron: '0 5 * * *' # daily
+  workflow_dispatch:     # allows manual runs from the Actions tab
+
+permissions:
+  contents: write        # lets the action push the star-history branch
+
+jobs:
+  star-history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Flux159/rust-star-history@main
+```
+
+**2.** Run it once (Actions tab → Star History → Run workflow), then put this in your `README.md`, replacing both `<USERNAME>/<REPONAME>` with your repo (e.g. `Flux159/mcp-server-kubernetes`):
+
+```html
+<a href="https://github.com/Flux159/rust-star-history">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/<USERNAME>/<REPONAME>/star-history/star-history-dark.svg">
+    <img alt="Star History" src="https://raw.githubusercontent.com/<USERNAME>/<REPONAME>/star-history/star-history.svg">
+  </picture>
+</a>
+```
+
+The chart updates daily on a dedicated `star-history` branch (main history stays clean) and automatically matches the viewer's light/dark theme. See [GitHub Action](#github-action-automated-always-fresh-charts) below for comparison charts, custom colors, and other options.
+
 ## Features
 
 - **Single self-contained binary** — talks to the GitHub REST API directly over HTTPS (rustls, no OpenSSL); builds and runs on macOS, Linux, and Windows
@@ -20,11 +57,13 @@ Generate self-hosted star-history SVG charts for any GitHub repository — a sin
 
 ## Install
 
+Prebuilt binaries (~2 MB) for Linux (x86_64/arm64), macOS (Intel/Apple Silicon), and Windows are attached to each [release](https://github.com/Flux159/rust-star-history/releases) — download, extract, run. Or build from source:
+
 ```sh
 cargo install --git https://github.com/Flux159/rust-star-history
 # or from a checkout:
 cargo install --path .
-# or just build a release binary (~2 MB):
+# or just build a release binary:
 cargo build --release   # → target/release/rust-star-history
 ```
 
@@ -62,29 +101,7 @@ rust-star-history --repo owner/name --token ghp_xxx
 
 ## GitHub Action: automated, always-fresh charts
 
-The bundled action regenerates your charts on a schedule and force-pushes them to a dedicated `star-history` branch — a consistent, predictable location in every repo that uses it, with no commit noise on `main`.
-
-**1.** Add `.github/workflows/star-history.yml` to your repo:
-
-```yaml
-name: Star History
-
-on:
-  schedule:
-    - cron: '17 3 * * 1' # weekly
-  workflow_dispatch:      # allows manual runs from the Actions tab
-
-permissions:
-  contents: write         # required to push the star-history branch
-
-jobs:
-  star-history:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: Flux159/rust-star-history@main
-```
-
-That's it. Run it once manually (Actions tab → Star History → Run workflow) to create the branch.
+The bundled action regenerates your charts on a schedule and force-pushes them to a dedicated `star-history` branch — a consistent, predictable location in every repo that uses it, with no commit noise on `main`. See the [Quickstart](#quickstart) above for the two-step setup; the sections below cover auth, configuration, and using the CLI without the action.
 
 ### No PAT required
 
@@ -94,17 +111,6 @@ You only need a PAT (passed via the `token` input) in two situations:
 
 - charting a **private repo other than** the one the workflow runs in
 - pushing the charts to a **different repo** than the one the workflow runs in
-
-**2.** After the first run, the branch `star-history` contains `star-history.svg` and `star-history-dark.svg`. Embed them in your README via raw URLs (replace `OWNER/REPO`):
-
-```html
-<a href="https://github.com/Flux159/rust-star-history">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/OWNER/REPO/star-history/star-history-dark.svg">
-    <img alt="Star History" src="https://raw.githubusercontent.com/OWNER/REPO/star-history/star-history.svg">
-  </picture>
-</a>
-```
 
 ### Action inputs
 
@@ -129,7 +135,7 @@ Example — comparison chart with custom colors:
           colors: '#dd4528,#28a9dd'
 ```
 
-The action compiles the CLI with the runner's preinstalled Rust toolchain on first use (about a minute); the rest of the run is a few seconds.
+The action downloads the prebuilt binary from this repo's releases (matching the action's pinned `@vX.Y.Z` tag, or the latest release when pinned to `@main`), so runs take just a few seconds. If no release asset exists for the runner's platform it falls back to building from source with the runner's Rust toolchain (about a minute).
 
 ### Using the CLI directly in a workflow (without the action)
 
@@ -190,6 +196,16 @@ The `<a>` wrapper makes the whole chart clickable. (The SVG itself contains a li
 cargo test          # unit tests: date math, sampling, tick logic, SVG structure
 cargo build --release
 ```
+
+### Releasing
+
+Push a version tag and CD does the rest:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The `cd.yml` workflow runs the tests, syncs `Cargo.toml`/`Cargo.lock` to the tag's version with `cargo set-version` (committing the bump back to main and moving the tag onto it), creates a GitHub release with generated notes, and builds + uploads prebuilt binaries for all five supported platforms.
 
 ## Font license
 

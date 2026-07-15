@@ -232,8 +232,11 @@ pub fn generate_svg(series: &[Series], opts: &Options) -> String {
         .map(|s| s.cum.last().unwrap().1)
         .max()
         .unwrap();
-    let step = tick_step(max_stars_all);
-    let y_max = max_stars_all.div_ceil(step).max(1) * step;
+    // ~8% headroom above the tallest line so its end-count label fits inside
+    // the plot instead of colliding with the curve near the top edge
+    let padded_max = max_stars_all + (max_stars_all / 12).max(1);
+    let step = tick_step(padded_max);
+    let y_max = padded_max.div_ceil(step).max(1) * step;
     let y_of = |count: u64| pad_t + plot_h - (count as f64 / y_max as f64) * plot_h;
 
     let font_b64 = BASE64.encode(FONT_WOFF2);
@@ -446,7 +449,7 @@ pub fn generate_svg(series: &[Series], opts: &Options) -> String {
         // dot and anchored so it never clips at the right edge
         let stars = fmt_short(s.cum.last().unwrap().1);
         let label_x = (last_pt.0 - 9.0).max(pad_l + 30.0);
-        let label_y = (last_pt.1 - 18.0).max(pad_t + 16.0);
+        let label_y = (last_pt.1 - 18.0).max(14.0);
         svg.push(
             "  ".to_string()
                 + &TextEl::new(

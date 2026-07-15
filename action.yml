@@ -43,13 +43,53 @@ runs:
   steps:
     - name: Install rust-star-history
       shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
       run: |
         set -euo pipefail
         if command -v rust-star-history >/dev/null 2>&1; then
           echo "rust-star-history already installed"
-        else
-          cargo install --locked --git "https://github.com/${GITHUB_ACTION_REPOSITORY:-Flux159/rust-star-history}" rust-star-history
+          exit 0
         fi
+
+        slug="${GITHUB_ACTION_REPOSITORY:-Flux159/rust-star-history}"
+        case "$(uname -m)" in
+          x86_64|amd64) arch="x86_64" ;;
+          aarch64|arm64) arch="aarch64" ;;
+          *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+        esac
+        case "$(uname -s)" in
+          Linux) triple="${arch}-unknown-linux-gnu" ;;
+          Darwin) triple="${arch}-apple-darwin" ;;
+          MINGW*|MSYS*|CYGWIN*) triple="${arch}-pc-windows-msvc" ;;
+          *) echo "unsupported OS: $(uname -s)" >&2; exit 1 ;;
+        esac
+        asset="rust-star-history-${triple}.tar.gz"
+
+        # Use the release matching the action's own version tag when pinned
+        # (e.g. uses: Flux159/rust-star-history@v0.2.0), else the latest release
+        if [[ "${GITHUB_ACTION_REF:-}" == v[0-9]* ]]; then
+          release_path="releases/tags/${GITHUB_ACTION_REF}"
+        else
+          release_path="releases/latest"
+        fi
+
+        install_dir="${RUNNER_TEMP}/rust-star-history-bin"
+        mkdir -p "$install_dir"
+        asset_url="$(curl -fsSL -H "Authorization: Bearer ${TOKEN}" \
+          "https://api.github.com/repos/${slug}/${release_path}" \
+          | jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .url' || true)"
+
+        if [ -n "$asset_url" ] && [ "$asset_url" != "null" ]; then
+          curl -fsSL -H "Authorization: Bearer ${TOKEN}" -H "Accept: application/octet-stream" \
+            "$asset_url" | tar -xz -C "$install_dir"
+          echo "Installed prebuilt ${asset} from ${slug} ${release_path##*/}"
+        else
+          echo "::notice::No prebuilt asset ${asset} found in ${slug} ${release_path}; building from source (slower)"
+          cargo install --locked --git "https://github.com/${slug}" --root "$install_dir" rust-star-history
+          mv "$install_dir/bin/rust-star-history" "$install_dir/"
+        fi
+        echo "$install_dir" >> "$GITHUB_PATH"
 
     - name: Generate charts
       shell: bash
@@ -62,7 +102,6 @@ runs:
         HEIGHT: ${{ inputs.height }}
       run: |
         set -euo pipefail
-        export PATH="$HOME/.cargo/bin:$PATH"
         args=(--repo "$REPOS" --both --title "$TITLE" --width "$WIDTH" --height "$HEIGHT" --output star-history.svg)
         if [ -n "$COLORS" ]; then
           args+=(--color "$COLORS")
