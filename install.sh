@@ -45,7 +45,7 @@ echo "Downloading ${url}"
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 curl -fsSL -o "$tmp" "$url" || {
-  echo "error: download failed — the latest release may still be publishing its assets; retry shortly" >&2
+  echo "error: download failed: the latest release may still be publishing its assets; retry shortly" >&2
   exit 1
 }
 tar -xzf "$tmp" -C "$INSTALL_DIR"
@@ -53,5 +53,5 @@ tar -xzf "$tmp" -C "$INSTALL_DIR"
 echo "Installed $("$INSTALL_DIR/rust-star-history" --version) to ${INSTALL_DIR}"
 case ":${PATH}:" in
   *":${INSTALL_DIR}:"*) ;;
-  *) echo "note: ${INSTALL_DIR} is not on your PATH — add it, e.g.: export PATH=\"${INSTALL_DIR}:\$PATH\"" ;;
+  *) echo "note: ${INSTALL_DIR} is not on your PATH; add it, e.g.: export PATH=\"${INSTALL_DIR}:\$PATH\"" ;;
 esac

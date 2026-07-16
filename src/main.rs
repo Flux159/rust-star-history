@@ -1,7 +1,7 @@
 //! rust-star-history: generate a star-history SVG chart for any GitHub repo.
 //!
 //! Self-hosted alternative to star-history.com. Talks to the GitHub REST API
-//! over plain HTTPS — no gh CLI required (though `gh auth token` is used as a
+//! over plain HTTPS, no gh CLI required (though `gh auth token` is used as a
 //! token fallback when available).
 
 mod chart;
@@ -14,7 +14,7 @@ use std::process::ExitCode;
 #[derive(Parser)]
 #[command(
     version,
-    about = "Generate a star-history SVG chart for any GitHub repo — no gh CLI required.",
+    about = "Generate a star-history SVG chart for any GitHub repo. No gh CLI required.",
     after_help = "\
 Examples:
   rust-star-history --repo Flux159/mcp-server-kubernetes
@@ -30,7 +30,7 @@ Embed in README.md (auto light/dark switching):
 
 Token lookup order: --token, $GITHUB_TOKEN, $GH_TOKEN, `gh auth token`.
 Since GitHub's 2026 API change, the stargazers list requires a token from a
-user with access to the repo (owner/collaborator) — unauthenticated requests
+user with access to the repo (owner/collaborator); unauthenticated requests
 and GitHub Actions workflow tokens are rejected."
 )]
 struct Args {

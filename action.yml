@@ -12,7 +12,7 @@ inputs:
   token:
     description: >-
       Token used to read stargazers. Since GitHub's 2026 API change this must be a token of a
-      user with access to the charted repo (e.g. a fine-grained PAT stored as a secret) — the
+      user with access to the charted repo (e.g. a fine-grained PAT stored as a secret); the
       automatic workflow token cannot list stargazers and will fail with 403.
     required: false
     default: ${{ github.token }}
