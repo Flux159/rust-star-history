@@ -20,6 +20,16 @@ pub struct Client {
 /// Cumulative star history: (day, total stars at end of that day), ascending.
 pub type Cumulative = Vec<(Day, u64)>;
 
+/// Result of a stargazer fetch: the cumulative curve plus the metadata the
+/// data store records alongside it.
+pub struct StarData {
+    pub cum: Cumulative,
+    pub stargazers_count: u64,
+    /// Whether this fetch skipped pages (page sampling) rather than reading
+    /// every page it covered.
+    pub sampled: bool,
+}
+
 impl Client {
     pub fn new(token: Option<String>) -> Client {
         let agent = ureq::AgentBuilder::new()
@@ -31,7 +41,12 @@ impl Client {
     fn get(&self, path: &str, accept: &str) -> Result<Value, String> {
         const MAX_ATTEMPTS: u32 = 6;
         let url = format!("{API}{path}");
+        // Debug aid: log every request (including retries) actually sent.
+        let trace = std::env::var_os("STAR_HISTORY_TRACE").is_some();
         for attempt in 1..=MAX_ATTEMPTS {
+            if trace {
+                eprintln!("TRACE GET {path}");
+            }
             let mut req = self
                 .agent
                 .get(&url)
@@ -105,14 +120,14 @@ impl Client {
             .collect()
     }
 
-    /// Fetch star history as cumulative (day, count) pairs.
+    /// Fetch star history from scratch.
     ///
     /// Repos needing at most `max_pages` requests are fetched exactly. Bigger
     /// ones are sampled: an evenly spaced subset of pages is fetched, and the
     /// cumulative count at each star is reconstructed from its page offset
     /// (page N starts at star (N-1)*100), the same approach star-history.com
     /// uses.
-    pub fn fetch_cumulative(&self, repo: &str, max_pages: u64) -> Result<Cumulative, String> {
+    pub fn fetch_full(&self, repo: &str, max_pages: u64) -> Result<StarData, String> {
         let count = self.stargazer_count(repo)?;
         if count == 0 {
             return Err(format!("no stargazers found for {repo}"));
@@ -131,6 +146,67 @@ impl Client {
             if sampled { " (sampled)" } else { "" }
         );
 
+        let anchors = self.fetch_pages(repo, &pages)?;
+        Ok(StarData {
+            cum: finalize(repo, anchors, count)?,
+            stargazers_count: count,
+            sampled,
+        })
+    }
+
+    /// Extend cached anchors by fetching only pages at and past the cached
+    /// end (the page holding the last cached star may have been partial, so
+    /// it is re-fetched; `collapse` dedupes the overlap).
+    ///
+    /// Returns Ok(None) when the cache can't be extended safely — net unstars
+    /// shift every page offset — and the caller should fall back to a full
+    /// fetch.
+    pub fn fetch_incremental(
+        &self,
+        repo: &str,
+        cached: &Cumulative,
+        cached_count: u64,
+        max_pages: u64,
+    ) -> Result<Option<StarData>, String> {
+        let cached_final = match cached.last() {
+            Some(&(_, n)) if n > 0 => n,
+            _ => return Ok(None),
+        };
+        let count = self.stargazer_count(repo)?;
+        if count < cached_final {
+            return Ok(None);
+        }
+        // Compare against the count seen last time, not the last anchor: the
+        // list can yield slightly fewer entries than stargazers_count (e.g.
+        // deleted accounts), which would otherwise refetch the last page on
+        // every run.
+        if count == cached_count || count == cached_final {
+            eprintln!("Stargazers for {repo}: {count} stars, unchanged since last fetch (cached)");
+            return Ok(Some(StarData {
+                cum: cached.clone(),
+                stargazers_count: count,
+                sampled: false,
+            }));
+        }
+
+        let total_pages = count.div_ceil(100).min(API_PAGE_CAP);
+        let (pages, sampled) = tail_pages(cached_final, total_pages, max_pages);
+        eprintln!(
+            "Fetching stargazers for {repo}: {count} stars, {cached_final} cached, {} new page(s){}",
+            pages.len(),
+            if sampled { " (sampled)" } else { "" }
+        );
+
+        let mut anchors = cached.clone();
+        anchors.extend(self.fetch_pages(repo, &pages)?);
+        Ok(Some(StarData {
+            cum: finalize(repo, anchors, count)?,
+            stargazers_count: count,
+            sampled,
+        }))
+    }
+
+    fn fetch_pages(&self, repo: &str, pages: &[u64]) -> Result<Vec<(Day, u64)>, String> {
         let mut anchors: Vec<(Day, u64)> = Vec::new();
         for (i, &page) in pages.iter().enumerate() {
             eprint!("\r  page {}/{}", i + 1, pages.len());
@@ -147,19 +223,38 @@ impl Client {
             );
         }
         eprintln!();
+        Ok(anchors)
+    }
+}
 
-        if anchors.is_empty() {
-            return Err(format!("no stargazers found for {repo}"));
-        }
+/// Pin the curve's endpoint past the API's 40k cap and collapse to daily anchors.
+fn finalize(repo: &str, mut anchors: Vec<(Day, u64)>, count: u64) -> Result<Cumulative, String> {
+    if anchors.is_empty() {
+        return Err(format!("no stargazers found for {repo}"));
+    }
+    // Stars past the API's 40k cap are unreachable; pin the curve's end to
+    // the true total so the chart doesn't understate the count.
+    if count > API_PAGE_CAP * 100 {
+        let last_day = anchors.iter().map(|a| a.0).max().unwrap();
+        anchors.push((last_day, count));
+    }
+    Ok(collapse(anchors))
+}
 
-        // Stars past the API's 40k cap are unreachable; pin the curve's end to
-        // the true total so the chart doesn't understate the count.
-        if count > API_PAGE_CAP * 100 {
-            let last_day = anchors.last().unwrap().0;
-            anchors.push((last_day, count));
-        }
-
-        Ok(collapse(anchors))
+/// Pages needed to extend a cache whose last anchor is star number
+/// `cached_final`: from the page containing that star through the last page,
+/// sampled (second return) when the span exceeds `max_pages`.
+fn tail_pages(cached_final: u64, total_pages: u64, max_pages: u64) -> (Vec<u64>, bool) {
+    let first = (cached_final / 100 + 1).min(total_pages);
+    let span = total_pages - first + 1;
+    if span > max_pages {
+        let pages = sample_pages(span, max_pages)
+            .into_iter()
+            .map(|p| p + first - 1)
+            .collect();
+        (pages, true)
+    } else {
+        ((first..=total_pages).collect(), false)
     }
 }
 
@@ -321,6 +416,23 @@ mod tests {
         assert_eq!(*s.last().unwrap(), 400);
         assert!(s.len() <= 30);
         assert!(s.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    #[test]
+    fn tail_pages_resumes_from_the_partial_last_page() {
+        // 337 stars cached → page 4 (stars 301+) onward, re-covering the overlap
+        assert_eq!(tail_pages(337, 10, 100), ((4..=10).collect(), false));
+        // exactly on a page boundary → next page only
+        assert_eq!(tail_pages(300, 4, 100), (vec![4], false));
+        // cached end at/past the API cap → re-fetch just the last page
+        assert_eq!(tail_pages(45_000, 400, 100), (vec![400], false));
+        // oversized tail gets sampled within [first, total]
+        let (pages, sampled) = tail_pages(1_000, 400, 10);
+        assert!(sampled);
+        assert!(pages.len() <= 10);
+        assert_eq!(*pages.first().unwrap(), 11);
+        assert_eq!(*pages.last().unwrap(), 400);
+        assert!(pages.windows(2).all(|w| w[0] < w[1]));
     }
 
     #[test]

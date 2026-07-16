@@ -48,6 +48,12 @@ inputs:
     description: 'Set to false to only generate star-history*.svg into the workspace without publishing'
     required: false
     default: 'true'
+  cache:
+    description: >-
+      Cache stargazer data between runs (via actions/cache) so scheduled runs only fetch pages
+      added since last time. Set to false to fetch everything fresh on every run.
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
@@ -102,6 +108,28 @@ runs:
         fi
         echo "$install_dir" >> "$GITHUB_PATH"
 
+    - name: Compute cache key
+      if: ${{ inputs.cache == 'true' }}
+      id: star-cache
+      shell: bash
+      env:
+        REPOS: ${{ inputs.repos }}
+      run: |
+        # Cache keys can't contain commas (or other exotic chars); flatten the repo list
+        echo "repos=$(printf '%s' "$REPOS" | tr -c 'A-Za-z0-9._-' '-')" >> "$GITHUB_OUTPUT"
+
+    # The key includes the run id so every run saves an updated cache; restore-keys
+    # picks up the most recent previous one. Evicted caches (GitHub drops unused
+    # entries after ~7 days) just mean one full refetch.
+    - name: Restore stargazer data cache
+      if: ${{ inputs.cache == 'true' }}
+      uses: actions/cache@v4
+      with:
+        path: .rust-star-history
+        key: star-history-data-${{ steps.star-cache.outputs.repos }}-${{ github.run_id }}
+        restore-keys: |
+          star-history-data-${{ steps.star-cache.outputs.repos }}-
+
     - name: Generate charts
       shell: bash
       env:
@@ -111,11 +139,15 @@ runs:
         COLORS: ${{ inputs.colors }}
         WIDTH: ${{ inputs.width }}
         HEIGHT: ${{ inputs.height }}
+        CACHE: ${{ inputs.cache }}
       run: |
         set -euo pipefail
         args=(--repo "$REPOS" --both --title "$TITLE" --width "$WIDTH" --height "$HEIGHT" --output star-history.svg)
         if [ -n "$COLORS" ]; then
           args+=(--color "$COLORS")
+        fi
+        if [ "$CACHE" != "true" ]; then
+          args+=(--no-cache)
         fi
         rust-star-history "${args[@]}"
 
