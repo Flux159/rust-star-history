@@ -7,8 +7,10 @@
 mod chart;
 mod date;
 mod github;
+mod store;
 
 use clap::Parser;
+use std::path::Path;
 use std::process::ExitCode;
 
 #[derive(Parser)]
@@ -21,6 +23,14 @@ Examples:
   rust-star-history --repo owner/name --output chart.svg --color '#0066cc'
   rust-star-history --repo owner/a --repo owner/b       # comparison chart
   rust-star-history --repo owner/a,owner/b --both       # same, plus dark variant
+  rust-star-history --repo owner/a --fetch-only         # update cached data, no chart
+  rust-star-history --repo owner/a,owner/b --offline owner/a   # owner/a from cache
+
+Fetched data is cached per repo in .rust-star-history/ (see --data-dir), so
+repeat runs only fetch pages added since last time. --no-cache bypasses the
+cache, --update-cache rebuilds it from scratch (this also happens automatically
+every 28 days), and --offline charts straight from it without contacting
+GitHub — handy when different repos need different tokens.
 
 Embed in README.md (auto light/dark switching):
   <picture>
@@ -73,6 +83,29 @@ struct Args {
     /// Max stargazer pages per repo (100 stars each); bigger repos are sampled
     #[arg(long, default_value_t = 100)]
     max_pages: u64,
+
+    /// Directory where fetched star data is cached (created on first use)
+    #[arg(long, default_value = ".rust-star-history")]
+    data_dir: String,
+
+    /// Bypass the data cache entirely: fetch fresh, read and write nothing
+    #[arg(long, conflicts_with_all = ["offline", "fetch_only", "update_cache"])]
+    no_cache: bool,
+
+    /// Chart from cached data without contacting GitHub; bare --offline
+    /// applies to all repos, or pass specific repos (repeat/comma-separate)
+    #[arg(long, value_delimiter = ',', num_args = 0..)]
+    offline: Option<Vec<String>>,
+
+    /// Fetch and cache star data only, without generating charts
+    #[arg(long)]
+    fetch_only: bool,
+
+    /// Discard cached data for the given repos and refetch from scratch
+    /// (otherwise the cache updates incrementally, with an automatic full
+    /// refresh every 28 days)
+    #[arg(long)]
+    update_cache: bool,
 }
 
 fn normalize_color(c: &str) -> String {
@@ -90,12 +123,128 @@ fn run(args: Args) -> Result<(), String> {
         }
     }
 
-    let token = github::resolve_token(args.token.clone());
-    let client = github::Client::new(token);
+    if let Some(list) = &args.offline {
+        for repo in list {
+            if !args.repo.contains(repo) {
+                return Err(format!(
+                    "--offline '{repo}' is not one of the --repo values"
+                ));
+            }
+        }
+    }
+    let offline = |repo: &String| {
+        args.offline
+            .as_ref()
+            .is_some_and(|list| list.is_empty() || list.contains(repo))
+    };
+
+    let data_dir = Path::new(&args.data_dir);
+    let today = date::Day::today();
+    let client = if args.repo.iter().all(offline) {
+        None // everything comes from the data dir; no token needed
+    } else {
+        Some(github::Client::new(github::resolve_token(
+            args.token.clone(),
+        )))
+    };
+
     let mut fetched: Vec<(String, github::Cumulative)> = Vec::new();
     for repo in &args.repo {
-        let cum = client.fetch_cumulative(repo, args.max_pages.max(2))?;
+        let cached = if args.no_cache {
+            None
+        } else {
+            store::load(data_dir, repo)
+        };
+
+        let cum = if offline(repo) {
+            let entry = cached.ok_or_else(|| {
+                format!(
+                    "--offline: no cached data for {repo} in {}; fetch it first \
+                     (e.g. rust-star-history --repo {repo} --fetch-only)",
+                    data_dir.display()
+                )
+            })?;
+            eprintln!(
+                "Using cached data for {repo}: {} stars as of {}",
+                entry.stargazers_count,
+                entry.updated_at.iso()
+            );
+            entry.anchors
+        } else {
+            let client = client.as_ref().expect("client exists for online repos");
+            let max_pages = args.max_pages.max(2);
+
+            // Try an incremental update of the cache; fall back to a full
+            // fetch when there is no usable cache, it's due for its periodic
+            // full refresh, or net unstars made incremental unsafe.
+            let mut full_fetch_at = today;
+            let mut prior_sampled = false;
+            let incremental = match &cached {
+                None => None,
+                Some(_) if args.update_cache => None,
+                Some(entry)
+                    if today.to_epoch_days() - entry.full_fetch_at.to_epoch_days()
+                        >= store::FULL_REFRESH_DAYS =>
+                {
+                    eprintln!(
+                        "Cached data for {repo} last fully fetched {}; doing the periodic full refresh",
+                        entry.full_fetch_at.iso()
+                    );
+                    None
+                }
+                Some(entry) => {
+                    let data = client.fetch_incremental(
+                        repo,
+                        &entry.anchors,
+                        entry.stargazers_count,
+                        max_pages,
+                    )?;
+                    if data.is_none() {
+                        eprintln!(
+                            "Star count for {repo} went down since the last fetch; refetching from scratch"
+                        );
+                    } else {
+                        full_fetch_at = entry.full_fetch_at;
+                        prior_sampled = entry.sampled;
+                    }
+                    data
+                }
+            };
+            let data = match incremental {
+                Some(data) => data,
+                None => client.fetch_full(repo, max_pages)?,
+            };
+
+            if !args.no_cache {
+                store::save(
+                    data_dir,
+                    &store::Entry {
+                        repo: repo.clone(),
+                        full_fetch_at,
+                        updated_at: today,
+                        stargazers_count: data.stargazers_count,
+                        sampled: prior_sampled || data.sampled,
+                        anchors: data.cum.clone(),
+                    },
+                )?;
+            }
+            data.cum
+        };
         fetched.push((repo.clone(), cum));
+    }
+
+    if args.fetch_only {
+        println!("Fetched star data into {}:", args.data_dir);
+        for (repo, cum) in &fetched {
+            let (first, last) = (cum[0].0, cum.last().unwrap().0);
+            println!(
+                "  {repo}: {} stars, {} – {}",
+                cum.last().unwrap().1,
+                first.month_day(),
+                last.month_day()
+            );
+        }
+        return Ok(());
     }
 
     let colors: Vec<String> = (0..fetched.len())
