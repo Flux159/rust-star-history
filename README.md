@@ -2,9 +2,9 @@
 
 Generate self-hosted star-history SVG charts for any GitHub repository.
 
-**Why this exists:** GitHub's 2026 stargazers API change broke star-history.com embeds — the charts in countless READMEs simply stopped rendering for public visitors. Instead of depending on a third-party service that can break again, this tool generates the chart as a static SVG you own: committed to your repo (or published to a branch by the bundled GitHub Action), it renders forever with no external services, no rate limits, and nothing to break.
+**Why this exists:** GitHub's 2026 stargazers API change broke star-history.com embeds, and the charts in a lot of READMEs stopped rendering for public visitors. Instead of depending on a third-party service that can break again, this tool generates the chart as a static SVG you own. Committed to your repo (or published to a branch by the bundled GitHub Action), it keeps rendering with no external service in the loop.
 
-Built in Rust with a small footprint: one static ~2 MB binary with everything embedded (even the font), talking directly to the GitHub API over HTTPS. Nothing else needs to be installed on your system — no gh CLI, no Python, no Node.
+Built in Rust: one static ~2 MB binary with everything embedded, even the font. It talks to the GitHub API directly over HTTPS, so there's nothing else to install (not even the gh CLI or a language runtime).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-dark.svg">
@@ -15,13 +15,13 @@ Built in Rust with a small footprint: one static ~2 MB binary with everything em
 
 Add a star-history chart to your own repo in three steps:
 
-**1.** Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with read-only access to your repo (Contents + Metadata is enough) and save it as an Actions secret named `STAR_HISTORY_TOKEN` — either in the repo UI (Settings → Secrets and variables → Actions) or with the [gh CLI](https://cli.github.com/):
+**1.** Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with read-only access to your repo (Contents + Metadata is enough) and save it as an Actions secret named `STAR_HISTORY_TOKEN`, either in the repo UI (Settings → Secrets and variables → Actions) or with the [gh CLI](https://cli.github.com/):
 
 ```sh
 gh secret set STAR_HISTORY_TOKEN -R <USERNAME>/<REPONAME>   # paste the PAT when prompted
 ```
 
-Since GitHub's 2026 API change, reading the stargazers list requires a token from a user with access to the repo — the automatic workflow token isn't allowed to.
+Since GitHub's 2026 API change, reading the stargazers list requires a token from a user with access to the repo. The automatic workflow token isn't allowed to.
 
 **2.** Create `.github/workflows/star-history.yml`:
 
@@ -60,14 +60,14 @@ The chart updates daily on a dedicated `star-history` branch (main history stays
 
 ## Features
 
-- **Single self-contained binary** — talks to the GitHub REST API directly over HTTPS (rustls, no OpenSSL); builds and runs on macOS, Linux, and Windows
-- **Self-contained SVG output** — the chart is a static file with the Handlee font (OFL licensed) embedded as a data URI, so it renders identically everywhere GitHub renders SVGs
-- **xkcd sketch aesthetic** — hand-drawn look via SVG `feTurbulence` + `feDisplacementMap` filters
-- **Multi-repo comparison** — pass `--repo` more than once to plot several repos on one chart, each with its own color
-- **Light & dark themes** — GitHub-dark palette, with `--both` emitting a matched pair for `<picture>`-based auto-switching
-- **GitHub Action included** — publish always-fresh charts to a `star-history` branch on a schedule
-- **Scales to big repos** — adaptive y-axis ticks, thinned month labels, and evenly-sampled page fetching for repos with tens of thousands of stars
-- **Flexible auth** — accepts a token via `--token`, `$GITHUB_TOKEN`, `$GH_TOKEN`, or (if installed) `gh auth token`; retries transient failures and rate limits with exponential backoff. (Since GitHub's 2026 API change the stargazers list requires a token from a user with access to the repo.)
+- **Single self-contained binary**: talks to the GitHub REST API directly over HTTPS (rustls, no OpenSSL); builds and runs on macOS, Linux, and Windows
+- **Self-contained SVG output**: the chart is a static file with the Handlee font (OFL licensed) embedded as a data URI, so it renders identically everywhere GitHub renders SVGs
+- **xkcd sketch aesthetic**: hand-drawn look via SVG `feTurbulence` + `feDisplacementMap` filters
+- **Multi-repo comparison**: pass `--repo` more than once to plot several repos on one chart, each with its own color
+- **Light & dark themes**: GitHub-dark palette, with `--both` emitting a matched pair for `<picture>`-based auto-switching
+- **GitHub Action included**: publish always-fresh charts to a `star-history` branch on a schedule
+- **Scales to big repos**: adaptive y-axis ticks, thinned month labels, and evenly-sampled page fetching for repos with tens of thousands of stars
+- **Flexible auth**: accepts a token via `--token`, `$GITHUB_TOKEN`, `$GH_TOKEN`, or (if installed) `gh auth token`; retries transient failures and rate limits with exponential backoff. (Since GitHub's 2026 API change the stargazers list requires a token from a user with access to the repo.)
 
 ## Install
 
@@ -80,7 +80,7 @@ Detects your platform and installs the prebuilt binary (~2 MB) from the latest [
 ## Usage
 
 ```sh
-# Basic — writes star-history.svg
+# Basic: writes star-history.svg
 rust-star-history --repo Flux159/mcp-server-kubernetes
 
 # Light + dark pair for README auto-switching
@@ -122,7 +122,7 @@ rust-star-history --repo Flux159/mcp-server-kubernetes --both
   <img alt="Star history of Flux159/mcp-server-kubernetes" src="assets/star-history.svg">
 </picture>
 
-Comparison charts draw one line per repo — pass `--repo` as many times as you like (or comma-separate); lines cycle through a built-in 8-color palette, or set your own with `--color`:
+Comparison charts draw one line per repo. Pass `--repo` as many times as you like (or comma-separate); lines cycle through a built-in 8-color palette, or set your own with `--color`:
 
 ```sh
 rust-star-history --repo Flux159/mcp-server-kubernetes --repo Flux159/mcp-chat --both
@@ -149,17 +149,17 @@ cargo build --release   # → target/release/rust-star-history
 
 ## GitHub Action: automated, always-fresh charts
 
-The bundled action regenerates your charts on a schedule and force-pushes them to a dedicated `star-history` branch — a consistent, predictable location in every repo that uses it, with no commit noise on `main`. See the [Quickstart](#quickstart) above for the three-step setup; the sections below cover auth, configuration, and using the CLI without the action.
+The bundled action regenerates your charts on a schedule and force-pushes them to a dedicated `star-history` branch: a predictable location in every repo that uses it, with no commit noise on `main`. See the [Quickstart](#quickstart) above for the three-step setup; the sections below cover auth, configuration, and using the CLI without the action.
 
 ### Tokens: why a PAT is needed
 
-Since GitHub's 2026 API change, the stargazers *list* endpoint (the one with `starred_at` timestamps) only works with a token belonging to a user who has access to the repo — typically the owner or a collaborator. Unauthenticated requests get a 401, and the workflow's automatic `${{ github.token }}` gets a 403, because it isn't a user token. That's why the `token` input should be a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) stored as an Actions secret; read-only access (Contents + Metadata) to the charted repo is enough.
+Since GitHub's 2026 API change, the stargazers *list* endpoint (the one with `starred_at` timestamps) only works with a token belonging to a user who has access to the repo (typically the owner or a collaborator). Unauthenticated requests get a 401, and the workflow's automatic `${{ github.token }}` gets a 403, because it isn't a user token. That's why the `token` input should be a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) stored as an Actions secret; read-only access (Contents + Metadata) to the charted repo is enough.
 
-Pushing the chart branch is a different story: the automatic token handles that fine, which is what the `push-token` input defaults to — so your PAT never needs write access when publishing to the same repo.
+Pushing the chart branch is a different story: the automatic token handles that fine, which is what the `push-token` input defaults to, so your PAT never needs write access when publishing to the same repo.
 
 **Comparison charts**: the PAT must have access to every repo being charted (your own repos all qualify automatically for a PAT scoped to them).
 
-**Pushing the charts to a different repo than the one the workflow runs in** — pass a `push-token` with write access (Contents) to the target repo:
+**Pushing the charts to a different repo than the one the workflow runs in**: pass a `push-token` with write access (Contents) to the target repo:
 
 ```yaml
       - uses: Flux159/rust-star-history@v1.0.0
@@ -176,7 +176,7 @@ All inputs are optional:
 | Input | Default | Description |
 |---|---|---|
 | `repos` | the current repo | Repo(s) to chart, comma-separated for a comparison chart |
-| `token` | `${{ github.token }}` | Token for reading stargazers — set this to a PAT secret; the default automatic token cannot list stargazers (see [Tokens](#tokens-why-a-pat-is-needed)) |
+| `token` | `${{ github.token }}` | Token for reading stargazers. Set this to a PAT secret; the default automatic token cannot list stargazers (see [Tokens](#tokens-why-a-pat-is-needed)) |
 | `branch` | `star-history` | Branch the SVGs are published to |
 | `target-repo` | the current repo | Repo the chart branch is pushed to (cross-repo publishing needs `push-token`) |
 | `push-token` | `${{ github.token }}` | Token used only for the branch push; the automatic token works for same-repo publishing |
@@ -185,7 +185,7 @@ All inputs are optional:
 | `width` / `height` | `800` / `533` | Chart dimensions |
 | `push` | `true` | Set `false` to only generate the SVGs into the workspace (e.g. to commit them yourself) |
 
-Example — comparison chart with custom colors:
+Example, a comparison chart with custom colors:
 
 ```yaml
       - uses: Flux159/rust-star-history@v1.0.0
@@ -199,7 +199,7 @@ The action downloads the prebuilt binary from this repo's releases (matching the
 
 ### Using the CLI directly in a workflow (without the action)
 
-The CLI picks up `$GITHUB_TOKEN` from the environment automatically — export your PAT secret there (the automatic workflow token can't read stargazers; see [Tokens](#tokens-why-a-pat-is-needed)). This example commits the SVGs to the current branch instead of a separate one:
+The CLI picks up `$GITHUB_TOKEN` from the environment automatically, so export your PAT secret there (the automatic workflow token can't read stargazers; see [Tokens](#tokens-why-a-pat-is-needed)). This example commits the SVGs to the current branch instead of a separate one:
 
 ```yaml
 name: Star History
@@ -242,7 +242,7 @@ If you generate charts locally instead of via the action, commit the SVGs next t
 </a>
 ```
 
-The `<a>` wrapper makes the whole chart clickable. (The SVG itself contains a link on the "Made with" attribution, but GitHub renders README images through a sandboxed `<img>` tag, so links inside an embedded SVG aren't clickable there — only wrapping the image works. The plain markdown form is `[![Star History](star-history.svg)](https://github.com/Flux159/rust-star-history)`.)
+The `<a>` wrapper makes the whole chart clickable. (The SVG itself contains a link on the "Made with" attribution, but GitHub renders README images through a sandboxed `<img>` tag, so links inside an embedded SVG aren't clickable there; only wrapping the image works. The plain markdown form is `[![Star History](star-history.svg)](https://github.com/Flux159/rust-star-history)`.)
 
 ## How it works
 

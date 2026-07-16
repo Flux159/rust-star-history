@@ -210,13 +210,13 @@ fn friendly_http_error(code: u16, body: &str, path: &str, had_token: bool) -> St
     {
         "GitHub's 2026 API change restricts the stargazers list to tokens of users with access \
          to the repo (owner/collaborator). Pass such a token via --token or GITHUB_TOKEN. In \
-         GitHub Actions, the automatic workflow token cannot read stargazers — set the action's \
+         GitHub Actions, the automatic workflow token cannot read stargazers; set the action's \
          `token` input to a PAT stored as a secret."
     } else {
         match code {
             401 => {
                 if had_token {
-                    "The token was rejected — check that it is valid and not expired."
+                    "The token was rejected; check that it is valid and not expired."
                 } else {
                     "Authentication is required since GitHub's 2026 API change. Pass a token via \
                      --token or GITHUB_TOKEN (it must belong to a user with access to the repo)."
@@ -270,7 +270,7 @@ pub fn resolve_token(explicit: Option<String>) -> Option<String> {
         }
     }
     eprintln!(
-        "No token found; trying unauthenticated (likely to fail — GitHub's 2026 API change \
+        "No token found; trying unauthenticated (likely to fail: GitHub's 2026 API change \
          requires a token from a user with access to the repo)"
     );
     None
