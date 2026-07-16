@@ -40,7 +40,7 @@ jobs:
   star-history:
     runs-on: ubuntu-latest
     steps:
-      - uses: Flux159/rust-star-history@v1.0.0
+      - uses: Flux159/rust-star-history@v1.1.0
         with:
           token: ${{ secrets.STAR_HISTORY_TOKEN }}
 ```
@@ -189,7 +189,7 @@ Pushing the chart branch is a different story: the automatic token handles that 
 **Pushing the charts to a different repo than the one the workflow runs in**: pass a `push-token` with write access (Contents) to the target repo:
 
 ```yaml
-      - uses: Flux159/rust-star-history@v1.0.0
+      - uses: Flux159/rust-star-history@v1.1.0
         with:
           target-repo: your-org/other-repo
           token: ${{ secrets.STAR_HISTORY_TOKEN }}
@@ -216,7 +216,7 @@ All inputs are optional:
 Example, a comparison chart with custom colors:
 
 ```yaml
-      - uses: Flux159/rust-star-history@v1.0.0
+      - uses: Flux159/rust-star-history@v1.1.0
         with:
           repos: Flux159/mcp-server-kubernetes,Flux159/mcp-chat
           colors: '#dd4528,#28a9dd'
