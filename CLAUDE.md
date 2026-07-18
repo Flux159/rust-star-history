@@ -60,4 +60,4 @@ The workflow runs tests, syncs `Cargo.toml`/`Cargo.lock` to the tag with `cargo 
 
 - `.github/workflows/ci.yml` — fmt, clippy `-D warnings`, tests, release build on pushes/PRs.
 - `.github/workflows/cd.yml` — the tag-triggered release pipeline described above.
-- `.github/workflows/star-history.yml` — self-charts this repo daily using the action; doubles as the canonical usage example.
+- `.github/workflows/star-history.yml` — self-charts this repo daily using the action; doubles as the canonical usage example. The action step runs with `continue-on-error: true` plus a `::warning` follow-up step so a transient rate-limit block never fails the run (no failure emails); README's Quickstart and "Transient rate limiting" section document the same pattern — keep them in sync.

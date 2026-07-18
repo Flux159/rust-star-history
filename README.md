@@ -41,9 +41,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: Flux159/rust-star-history@v1.1.1
+        id: chart
+        continue-on-error: true  # a missed refresh is harmless; warn instead of failing (see below)
         with:
           token: ${{ secrets.STAR_HISTORY_TOKEN }}
+      - name: Warn instead of failing
+        if: ${{ steps.chart.outcome == 'failure' }}
+        run: echo "::warning::Chart update failed (likely GitHub's transient rate-limit block); charts were not refreshed this run"
 ```
+
+The last two lines are optional but recommended for scheduled runs: GitHub's API occasionally 403-blocks stargazer reads for a few minutes at a time (see [Transient rate limiting](#transient-rate-limiting)), and without them a blip like that fails the run and triggers GitHub's failure-notification email — for a missed refresh the next day's run fixes on its own.
 
 **3.** Run it once (Actions tab → Star History → Run workflow), then put this in your `README.md`, replacing both `<USERNAME>/<REPONAME>` with your repo (e.g. `Flux159/mcp-server-kubernetes`):
 
@@ -226,6 +233,10 @@ Example, a comparison chart with custom colors:
 The action downloads the prebuilt binary straight from this repo's release downloads (matching the action's pinned `@vX.Y.Z` tag, or the latest release when pinned to `@main`), so runs take just a few seconds. The download needs no token and doesn't count against API rate limits; if it fails the action errors out rather than silently falling back to a slow source build.
 
 The action also carries the stargazer data cache between runs with `actions/cache`, so a daily schedule fetches only the stars gained since yesterday instead of the repo's whole history (see [Caching and offline data](#caching-and-offline-data)). GitHub evicts caches unused for about a week; a miss is harmless and just means one full refetch. Every 28 days the CLI does a full refetch anyway to shed any drift from unstarred repos.
+
+### Transient rate limiting
+
+GitHub sometimes 403-blocks `/repos/*` API reads for a few minutes with an "API rate limit exceeded" message even when the token's hourly quota is untouched (a separate anti-scraping bucket). The CLI retries with exponential backoff for about a minute, but a block can outlast that and fail the run. Since a scheduled chart refresh is not urgent — the next run catches up automatically — the recommended workflow (see [Quickstart](#quickstart)) marks the action step `continue-on-error: true` and follows it with a step that emits a `::warning` annotation instead, keeping the run green so GitHub doesn't send a failure email over a transient miss.
 
 ### Using the CLI directly in a workflow (without the action)
 
