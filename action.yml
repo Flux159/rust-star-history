@@ -61,7 +61,9 @@ runs:
     - name: Install rust-star-history
       shell: bash
       env:
-        TOKEN: ${{ inputs.token }}
+        # GITHUB_ACTION_REF is unset inside composite run steps on some runner
+        # versions; the expression context is the reliable source of the pin
+        ACTION_REF: ${{ github.action_ref }}
       run: |
         set -euo pipefail
         if command -v rust-star-history >/dev/null 2>&1; then
@@ -83,29 +85,24 @@ runs:
         esac
         asset="rust-star-history-${triple}.tar.gz"
 
+        # Release assets are served from GitHub's CDN, not the REST API: no
+        # token needed for a public repo and no API rate limit to trip over.
         # Use the release matching the action's own version tag when pinned
-        # (e.g. uses: Flux159/rust-star-history@v1.1.0), else the latest release
-        if [[ "${GITHUB_ACTION_REF:-}" == v[0-9]* ]]; then
-          release_path="releases/tags/${GITHUB_ACTION_REF}"
+        # (e.g. uses: Flux159/rust-star-history@v1.1.0), else the latest release.
+        ref="${ACTION_REF:-${GITHUB_ACTION_REF:-}}"
+        if [[ "$ref" == v[0-9]* ]]; then
+          url="https://github.com/${slug}/releases/download/${ref}/${asset}"
         else
-          release_path="releases/latest"
+          url="https://github.com/${slug}/releases/latest/download/${asset}"
         fi
 
         install_dir="${RUNNER_TEMP}/rust-star-history-bin"
         mkdir -p "$install_dir"
-        asset_url="$(curl -fsSL -H "Authorization: Bearer ${TOKEN}" \
-          "https://api.github.com/repos/${slug}/${release_path}" \
-          | jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .url' || true)"
-
-        if [ -n "$asset_url" ] && [ "$asset_url" != "null" ]; then
-          curl -fsSL -H "Authorization: Bearer ${TOKEN}" -H "Accept: application/octet-stream" \
-            "$asset_url" | tar -xz -C "$install_dir"
-          echo "Installed prebuilt ${asset} from ${slug} ${release_path##*/}"
-        else
-          echo "::notice::No prebuilt asset ${asset} found in ${slug} ${release_path}; building from source (slower)"
-          cargo install --locked --git "https://github.com/${slug}" --root "$install_dir" rust-star-history
-          mv "$install_dir/bin/rust-star-history" "$install_dir/"
+        if ! curl -fsSL --retry 5 "$url" | tar -xz -C "$install_dir"; then
+          echo "::error::Failed to download prebuilt binary from ${url}" >&2
+          exit 1
         fi
+        echo "Installed prebuilt ${asset} from ${url}"
         echo "$install_dir" >> "$GITHUB_PATH"
 
     - name: Compute cache key

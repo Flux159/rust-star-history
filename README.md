@@ -40,7 +40,7 @@ jobs:
   star-history:
     runs-on: ubuntu-latest
     steps:
-      - uses: Flux159/rust-star-history@v1.1.0
+      - uses: Flux159/rust-star-history@v1.1.1
         with:
           token: ${{ secrets.STAR_HISTORY_TOKEN }}
 ```
@@ -189,7 +189,7 @@ Pushing the chart branch is a different story: the automatic token handles that 
 **Pushing the charts to a different repo than the one the workflow runs in**: pass a `push-token` with write access (Contents) to the target repo:
 
 ```yaml
-      - uses: Flux159/rust-star-history@v1.1.0
+      - uses: Flux159/rust-star-history@v1.1.1
         with:
           target-repo: your-org/other-repo
           token: ${{ secrets.STAR_HISTORY_TOKEN }}
@@ -216,14 +216,14 @@ All inputs are optional:
 Example, a comparison chart with custom colors:
 
 ```yaml
-      - uses: Flux159/rust-star-history@v1.1.0
+      - uses: Flux159/rust-star-history@v1.1.1
         with:
           repos: Flux159/mcp-server-kubernetes,Flux159/mcp-chat
           colors: '#dd4528,#28a9dd'
           token: ${{ secrets.STAR_HISTORY_TOKEN }}
 ```
 
-The action downloads the prebuilt binary from this repo's releases (matching the action's pinned `@vX.Y.Z` tag, or the latest release when pinned to `@main`), so runs take just a few seconds. If no release asset exists for the runner's platform it falls back to building from source with the runner's Rust toolchain (about a minute).
+The action downloads the prebuilt binary straight from this repo's release downloads (matching the action's pinned `@vX.Y.Z` tag, or the latest release when pinned to `@main`), so runs take just a few seconds. The download needs no token and doesn't count against API rate limits; if it fails the action errors out rather than silently falling back to a slow source build.
 
 The action also carries the stargazer data cache between runs with `actions/cache`, so a daily schedule fetches only the stars gained since yesterday instead of the repo's whole history (see [Caching and offline data](#caching-and-offline-data)). GitHub evicts caches unused for about a week; a miss is harmless and just means one full refetch. Every 28 days the CLI does a full refetch anyway to shed any drift from unstarred repos.
 

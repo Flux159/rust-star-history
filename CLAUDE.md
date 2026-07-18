@@ -54,7 +54,7 @@ git tag v1.0.1 && git push origin v1.0.1
 
 The workflow runs tests, syncs `Cargo.toml`/`Cargo.lock` to the tag with `cargo set-version` (committing the bump back to main and force-moving the tag onto it), creates a GitHub release with generated notes, then builds and uploads binaries for four targets (Linux x86_64/arm64, macOS arm64, Windows x86_64). Intel mac is intentionally not built — source install covers it.
 
-`action.yml` (the reusable composite action) downloads the release asset matching the runner's platform — pinned to the action's own `@vX.Y.Z` ref, else latest — and falls back to `cargo install --git` only when no asset exists. `install.sh` is the curl-based installer served from main via raw.githubusercontent.
+`action.yml` (the reusable composite action) downloads the release asset matching the runner's platform via the direct `github.com/…/releases/download/…` CDN URL (pinned to the action's own `@vX.Y.Z` ref, else `releases/latest/download`) — deliberately not the REST API, which needs a token and can hit rate limits (a fine-grained PAT once burned its quota and 403'd the lookup). A failed download is a hard error; there is no build-from-source fallback. `install.sh` is the curl-based installer served from main via raw.githubusercontent.
 
 ## Workflows
 
